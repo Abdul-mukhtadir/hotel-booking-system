@@ -36,11 +36,67 @@ function RegisterPage() {
     });
   };
 
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      toast.error("Name is required");
+      return false;
+    }
+
+    if (formData.name.trim().length < 3) {
+      toast.error("Name must be at least 3 characters");
+      return false;
+    }
+
+    if (!formData.email.trim()) {
+      toast.error("Email is required");
+      return false;
+    }
+
+    const emailRegex =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(formData.email)) {
+      toast.error("Enter a valid email address");
+      return false;
+    }
+
+    if (!formData.phone.trim()) {
+      toast.error("Phone number is required");
+      return false;
+    }
+
+    const phoneRegex = /^[0-9]{10}$/;
+
+    if (!phoneRegex.test(formData.phone)) {
+      toast.error("Phone number must be exactly 10 digits");
+      return false;
+    }
+
+    if (!formData.password.trim()) {
+      toast.error("Password is required");
+      return false;
+    }
+
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!validateForm()) return;
+
     try {
-      const data = await registerUser(formData);
+      const data = await registerUser({
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        password: formData.password,
+      });
 
       localStorage.setItem(
         "user",
@@ -103,6 +159,7 @@ function RegisterPage() {
                 type="text"
                 name="name"
                 placeholder="Full Name"
+                value={formData.name}
                 className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={handleChange}
                 required
@@ -112,24 +169,39 @@ function RegisterPage() {
                 type="email"
                 name="email"
                 placeholder="Email Address"
+                value={formData.email}
                 className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={handleChange}
                 required
               />
 
               <input
-                type="text"
+                type="tel"
                 name="phone"
-                placeholder="Phone Number"
+                placeholder="10 Digit Phone Number"
+                value={formData.phone}
+                maxLength="10"
                 className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={handleChange}
+                onChange={(e) => {
+                  const onlyNumbers =
+                    e.target.value.replace(
+                      /\D/g,
+                      ""
+                    );
+
+                  setFormData({
+                    ...formData,
+                    phone: onlyNumbers,
+                  });
+                }}
                 required
               />
 
               <input
                 type="password"
                 name="password"
-                placeholder="Password"
+                placeholder="Password Min 6 Characters"
+                value={formData.password}
                 className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={handleChange}
                 required
