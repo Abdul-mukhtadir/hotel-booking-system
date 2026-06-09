@@ -62,6 +62,11 @@ function BookingPage() {
   const [appliedCoupon, setAppliedCoupon] =
     useState("");
 
+  const todayDate =
+    new Date()
+      .toISOString()
+      .split("T")[0];
+
   useEffect(() => {
     fetchRoom();
   }, []);
@@ -103,6 +108,58 @@ function BookingPage() {
     return days > 0 ? days : 1;
   };
 
+  const validateBooking = () => {
+    if (!checkInDate || !checkOutDate) {
+      toast.error(
+        "Select check-in and check-out dates"
+      );
+      return false;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const checkIn =
+      new Date(checkInDate);
+
+    const checkOut =
+      new Date(checkOutDate);
+
+    if (checkIn < today) {
+      toast.error(
+        "Past dates are not allowed"
+      );
+      return false;
+    }
+
+    if (checkOut <= checkIn) {
+      toast.error(
+        "Check-out date must be after check-in date"
+      );
+      return false;
+    }
+
+    if (!guests || Number(guests) < 1) {
+      toast.error(
+        "Guests should be at least 1"
+      );
+      return false;
+    }
+
+    if (
+      room?.capacity &&
+      Number(guests) >
+        Number(room.capacity)
+    ) {
+      toast.error(
+        `Maximum ${room.capacity} guests allowed`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const totalPrice =
     room?.price *
     calculateDays();
@@ -112,6 +169,10 @@ function BookingPage() {
 
   const applyCoupon =
     async () => {
+      if (!validateBooking()) {
+        return;
+      }
+
       if (!couponCode) {
         toast.error(
           "Enter coupon code"
@@ -169,13 +230,7 @@ function BookingPage() {
         return;
       }
 
-      if (
-        !checkInDate ||
-        !checkOutDate
-      ) {
-        toast.error(
-          "Select check-in and check-out dates"
-        );
+      if (!validateBooking()) {
         return;
       }
 
@@ -221,7 +276,8 @@ function BookingPage() {
 
                     checkOutDate,
 
-                    guests,
+                    guests:
+                      Number(guests),
 
                     totalPrice:
                       payableAmount,
@@ -248,7 +304,9 @@ function BookingPage() {
                 console.log(error);
 
                 toast.error(
-                  "Booking Failed"
+                  error.response?.data
+                    ?.message ||
+                    "Booking Failed"
                 );
               }
             },
@@ -269,7 +327,9 @@ function BookingPage() {
         console.log(error);
 
         toast.error(
-          "Payment failed"
+          error.response?.data
+            ?.message ||
+            "Payment failed"
         );
       }
     };
@@ -409,13 +469,18 @@ function BookingPage() {
 
                     <input
                       type="date"
+                      min={todayDate}
                       className="w-full border border-gray-300 p-4 rounded-2xl mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={checkInDate}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setCheckInDate(
                           e.target.value
-                        )
-                      }
+                        );
+
+                        setDiscount(0);
+                        setFinalAmount(null);
+                        setAppliedCoupon("");
+                      }}
                     />
                   </div>
 
@@ -426,13 +491,21 @@ function BookingPage() {
 
                     <input
                       type="date"
+                      min={
+                        checkInDate ||
+                        todayDate
+                      }
                       className="w-full border border-gray-300 p-4 rounded-2xl mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={checkOutDate}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setCheckOutDate(
                           e.target.value
-                        )
-                      }
+                        );
+
+                        setDiscount(0);
+                        setFinalAmount(null);
+                        setAppliedCoupon("");
+                      }}
                     />
                   </div>
 
@@ -444,11 +517,14 @@ function BookingPage() {
                     <input
                       type="number"
                       min="1"
+                      max={room.capacity}
                       className="w-full border border-gray-300 p-4 rounded-2xl mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={guests}
                       onChange={(e) =>
                         setGuests(
-                          e.target.value
+                          Number(
+                            e.target.value
+                          )
                         )
                       }
                     />

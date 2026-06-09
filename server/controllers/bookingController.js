@@ -2,6 +2,8 @@ import asyncHandler from "express-async-handler";
 
 import Booking from "../models/Booking.js";
 
+import Room from "../models/Room.js";
+
 import sendEmail from "../utils/sendEmail.js";
 
 // CREATE BOOKING
@@ -17,16 +19,76 @@ const createBooking = asyncHandler(async (req, res) => {
     paymentStatus,
   } = req.body;
 
+  if (
+    !room ||
+    !hotel ||
+    !checkInDate ||
+    !checkOutDate ||
+    !guests ||
+    !totalPrice
+  ) {
+    res.status(400);
+    throw new Error("Please fill all booking details");
+  }
+
+  const selectedRoom = await Room.findById(room);
+
+  if (!selectedRoom) {
+    res.status(404);
+    throw new Error("Room not found");
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const checkIn = new Date(checkInDate);
+  const checkOut = new Date(checkOutDate);
+
+  if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
+    res.status(400);
+    throw new Error("Invalid booking dates");
+  }
+
+  if (checkIn < today) {
+    res.status(400);
+    throw new Error("Check-in date cannot be in the past");
+  }
+
+  if (checkOut <= checkIn) {
+    res.status(400);
+    throw new Error("Check-out date must be after check-in date");
+  }
+
+  if (Number(guests) < 1) {
+    res.status(400);
+    throw new Error("Guests should be at least 1");
+  }
+
+  if (
+    selectedRoom.capacity &&
+    Number(guests) > Number(selectedRoom.capacity)
+  ) {
+    res.status(400);
+    throw new Error(
+      `Maximum ${selectedRoom.capacity} guests allowed`
+    );
+  }
+
+  if (Number(totalPrice) <= 0) {
+    res.status(400);
+    throw new Error("Invalid total price");
+  }
+
   const existingBooking = await Booking.findOne({
     room,
     bookingStatus: "Booked",
     $or: [
       {
         checkInDate: {
-          $lte: new Date(checkOutDate),
+          $lt: checkOut,
         },
         checkOutDate: {
-          $gte: new Date(checkInDate),
+          $gt: checkIn,
         },
       },
     ],
@@ -41,10 +103,10 @@ const createBooking = asyncHandler(async (req, res) => {
     user: req.user._id,
     room,
     hotel,
-    checkInDate,
-    checkOutDate,
-    guests,
-    totalPrice,
+    checkInDate: checkIn,
+    checkOutDate: checkOut,
+    guests: Number(guests),
+    totalPrice: Number(totalPrice),
     specialRequests,
     paymentStatus: paymentStatus || "Pending",
   });
@@ -54,41 +116,43 @@ const createBooking = asyncHandler(async (req, res) => {
     .populate("hotel")
     .populate("room");
 
-  try {
-    await sendEmail({
-      to: populatedBooking.user.email,
-      subject: "Booking Confirmation - Hotel Booking System",
-      html: `
-        <h2>Booking Confirmed</h2>
-        <p>Hello <b>${populatedBooking.user.name}</b>,</p>
-        <p>Your hotel booking has been confirmed successfully.</p>
-
-        <h3>Booking Details</h3>
-        <p><b>Hotel:</b> ${populatedBooking.hotel?.name}</p>
-        <p><b>Room:</b> ${populatedBooking.room?.roomType}</p>
-        <p><b>Room Number:</b> ${populatedBooking.room?.roomNumber}</p>
-        <p><b>Check In:</b> ${new Date(populatedBooking.checkInDate).toLocaleDateString()}</p>
-        <p><b>Check Out:</b> ${new Date(populatedBooking.checkOutDate).toLocaleDateString()}</p>
-        <p><b>Guests:</b> ${populatedBooking.guests}</p>
-        <p><b>Total Amount:</b> ₹${populatedBooking.totalPrice}</p>
-        <p><b>Payment Status:</b> ${populatedBooking.paymentStatus}</p>
-        <p><b>Booking Status:</b> ${populatedBooking.bookingStatus}</p>
-
-        ${
-          populatedBooking.specialRequests
-            ? `<p><b>Special Request:</b> ${populatedBooking.specialRequests}</p>`
-            : ""
-        }
-
-        <br/>
-        <p>Thank you for booking with us.</p>
-      `,
-    });
-  } catch (error) {
-    console.log("Booking Email Error:", error.message);
-  }
-
   res.status(201).json(populatedBooking);
+
+  sendEmail({
+    to: populatedBooking.user.email,
+    subject: "Booking Confirmation - Hotel Booking System",
+    html: `
+      <h2>Booking Confirmed</h2>
+      <p>Hello <b>${populatedBooking.user.name}</b>,</p>
+      <p>Your hotel booking has been confirmed successfully.</p>
+
+      <h3>Booking Details</h3>
+      <p><b>Hotel:</b> ${populatedBooking.hotel?.name}</p>
+      <p><b>Room:</b> ${populatedBooking.room?.roomType}</p>
+      <p><b>Room Number:</b> ${populatedBooking.room?.roomNumber}</p>
+      <p><b>Check In:</b> ${new Date(
+        populatedBooking.checkInDate
+      ).toLocaleDateString()}</p>
+      <p><b>Check Out:</b> ${new Date(
+        populatedBooking.checkOutDate
+      ).toLocaleDateString()}</p>
+      <p><b>Guests:</b> ${populatedBooking.guests}</p>
+      <p><b>Total Amount:</b> ₹${populatedBooking.totalPrice}</p>
+      <p><b>Payment Status:</b> ${populatedBooking.paymentStatus}</p>
+      <p><b>Booking Status:</b> ${populatedBooking.bookingStatus}</p>
+
+      ${
+        populatedBooking.specialRequests
+          ? `<p><b>Special Request:</b> ${populatedBooking.specialRequests}</p>`
+          : ""
+      }
+
+      <br/>
+      <p>Thank you for booking with us.</p>
+    `,
+  }).catch((error) => {
+    console.log("Booking Email Error:", error.message);
+  });
 });
 
 // GET MY BOOKINGS
@@ -121,9 +185,49 @@ const updateBooking = asyncHandler(async (req, res) => {
     throw new Error("Booking not found");
   }
 
-  booking.checkInDate = req.body.checkInDate || booking.checkInDate;
-  booking.checkOutDate = req.body.checkOutDate || booking.checkOutDate;
-  booking.guests = req.body.guests || booking.guests;
+  if (req.body.checkInDate || req.body.checkOutDate) {
+    const newCheckIn = req.body.checkInDate
+      ? new Date(req.body.checkInDate)
+      : new Date(booking.checkInDate);
+
+    const newCheckOut = req.body.checkOutDate
+      ? new Date(req.body.checkOutDate)
+      : new Date(booking.checkOutDate);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (
+      Number.isNaN(newCheckIn.getTime()) ||
+      Number.isNaN(newCheckOut.getTime())
+    ) {
+      res.status(400);
+      throw new Error("Invalid booking dates");
+    }
+
+    if (newCheckIn < today) {
+      res.status(400);
+      throw new Error("Check-in date cannot be in the past");
+    }
+
+    if (newCheckOut <= newCheckIn) {
+      res.status(400);
+      throw new Error("Check-out date must be after check-in date");
+    }
+
+    booking.checkInDate = newCheckIn;
+    booking.checkOutDate = newCheckOut;
+  }
+
+  if (req.body.guests) {
+    if (Number(req.body.guests) < 1) {
+      res.status(400);
+      throw new Error("Guests should be at least 1");
+    }
+
+    booking.guests = Number(req.body.guests);
+  }
+
   booking.bookingStatus = req.body.bookingStatus || booking.bookingStatus;
   booking.paymentStatus = req.body.paymentStatus || booking.paymentStatus;
 
@@ -148,33 +252,35 @@ const cancelBooking = asyncHandler(async (req, res) => {
 
   await booking.save();
 
-  try {
-    await sendEmail({
-      to: booking.user.email,
-      subject: "Booking Cancelled - Hotel Booking System",
-      html: `
-        <h2>Booking Cancelled</h2>
-        <p>Hello <b>${booking.user.name}</b>,</p>
-        <p>Your booking has been cancelled.</p>
-
-        <h3>Cancelled Booking Details</h3>
-        <p><b>Hotel:</b> ${booking.hotel?.name}</p>
-        <p><b>Room:</b> ${booking.room?.roomType}</p>
-        <p><b>Room Number:</b> ${booking.room?.roomNumber}</p>
-        <p><b>Check In:</b> ${new Date(booking.checkInDate).toLocaleDateString()}</p>
-        <p><b>Check Out:</b> ${new Date(booking.checkOutDate).toLocaleDateString()}</p>
-        <p><b>Total Amount:</b> ₹${booking.totalPrice}</p>
-
-        <br/>
-        <p>If this was a mistake, please contact hotel support.</p>
-      `,
-    });
-  } catch (error) {
-    console.log("Cancellation Email Error:", error.message);
-  }
-
   res.json({
     message: "Booking cancelled successfully",
+  });
+
+  sendEmail({
+    to: booking.user.email,
+    subject: "Booking Cancelled - Hotel Booking System",
+    html: `
+      <h2>Booking Cancelled</h2>
+      <p>Hello <b>${booking.user.name}</b>,</p>
+      <p>Your booking has been cancelled.</p>
+
+      <h3>Cancelled Booking Details</h3>
+      <p><b>Hotel:</b> ${booking.hotel?.name}</p>
+      <p><b>Room:</b> ${booking.room?.roomType}</p>
+      <p><b>Room Number:</b> ${booking.room?.roomNumber}</p>
+      <p><b>Check In:</b> ${new Date(
+        booking.checkInDate
+      ).toLocaleDateString()}</p>
+      <p><b>Check Out:</b> ${new Date(
+        booking.checkOutDate
+      ).toLocaleDateString()}</p>
+      <p><b>Total Amount:</b> ₹${booking.totalPrice}</p>
+
+      <br/>
+      <p>If this was a mistake, please contact hotel support.</p>
+    `,
+  }).catch((error) => {
+    console.log("Cancellation Email Error:", error.message);
   });
 });
 
@@ -210,8 +316,12 @@ const sendBookingReminder = asyncHandler(async (req, res) => {
       <p><b>Hotel:</b> ${booking.hotel?.name}</p>
       <p><b>Room:</b> ${booking.room?.roomType}</p>
       <p><b>Room Number:</b> ${booking.room?.roomNumber}</p>
-      <p><b>Check In:</b> ${new Date(booking.checkInDate).toLocaleDateString()}</p>
-      <p><b>Check Out:</b> ${new Date(booking.checkOutDate).toLocaleDateString()}</p>
+      <p><b>Check In:</b> ${new Date(
+        booking.checkInDate
+      ).toLocaleDateString()}</p>
+      <p><b>Check Out:</b> ${new Date(
+        booking.checkOutDate
+      ).toLocaleDateString()}</p>
       <p><b>Guests:</b> ${booking.guests}</p>
       <p><b>Total Amount:</b> ₹${booking.totalPrice}</p>
       <p><b>Payment Status:</b> ${booking.paymentStatus}</p>
