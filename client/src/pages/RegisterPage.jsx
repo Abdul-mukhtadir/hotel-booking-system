@@ -29,60 +29,97 @@ function RegisterPage() {
     phone: "",
   });
 
+  const [errors, setErrors] = useState({});
+
+  const [loading, setLoading] = useState(false);
+
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "phone") {
+      const onlyNumbers = value.replace(/\D/g, "");
+
+      setFormData({
+        ...formData,
+        phone: onlyNumbers,
+      });
+
+      setErrors({
+        ...errors,
+        phone: "",
+      });
+
+      return;
+    }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
+    });
+
+    setErrors({
+      ...errors,
+      [name]: "",
     });
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      toast.error("Name is required");
-      return false;
-    }
+    const newErrors = {};
 
-    if (formData.name.trim().length < 3) {
-      toast.error("Name must be at least 3 characters");
-      return false;
-    }
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedPhone = formData.phone.trim();
 
-    if (!formData.email.trim()) {
-      toast.error("Email is required");
-      return false;
-    }
-
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(formData.email)) {
-      toast.error("Enter a valid email address");
-      return false;
-    }
-
-    if (!formData.phone.trim()) {
-      toast.error("Phone number is required");
-      return false;
-    }
-
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10}$/;
 
-    if (!phoneRegex.test(formData.phone)) {
-      toast.error("Phone number must be exactly 10 digits");
-      return false;
+    if (!trimmedName) {
+      newErrors.name = "Name is required";
+    } else if (trimmedName.length < 3) {
+      newErrors.name = "Name must be at least 3 characters";
+    }
+
+    if (!trimmedEmail) {
+      newErrors.email = "Email is required";
+    } else if (!emailRegex.test(trimmedEmail)) {
+      newErrors.email = "Enter a valid email address";
+    }
+
+    if (!trimmedPhone) {
+      newErrors.phone = "Phone number is required";
+    } else if (!phoneRegex.test(trimmedPhone)) {
+      newErrors.phone = "Phone number must be exactly 10 digits";
     }
 
     if (!formData.password.trim()) {
-      toast.error("Password is required");
-      return false;
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
     }
 
-    if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      const firstError = Object.values(newErrors)[0];
+      toast.error(firstError);
       return false;
     }
 
     return true;
+  };
+
+  const getErrorMessage = (error) => {
+    const message =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      "Registration failed";
+
+    if (typeof message === "string") {
+      return message;
+    }
+
+    return "Registration failed";
   };
 
   const handleSubmit = async (e) => {
@@ -91,6 +128,8 @@ function RegisterPage() {
     if (!validateForm()) return;
 
     try {
+      setLoading(true);
+
       const data = await registerUser({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -109,10 +148,10 @@ function RegisterPage() {
 
       navigate("/");
     } catch (error) {
-      toast.error(
-        error.response?.data?.message ||
-          "Registration failed"
-      );
+      const message = getErrorMessage(error);
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,6 +184,7 @@ function RegisterPage() {
           <form
             onSubmit={handleSubmit}
             className="p-8 md:p-12"
+            noValidate
           >
             <p className="uppercase tracking-widest text-blue-600 font-semibold">
               Create Account
@@ -155,63 +195,77 @@ function RegisterPage() {
             </h1>
 
             <div className="space-y-5">
-              <input
-                type="text"
-                name="name"
-                placeholder="Full Name"
-                value={formData.name}
-                className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={handleChange}
-                required
-              />
+              <div>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Full Name"
+                  value={formData.name}
+                  className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={handleChange}
+                />
+                {errors.name && (
+                  <p className="text-red-600 text-sm mt-1">
+                    {errors.name}
+                  </p>
+                )}
+              </div>
 
-              <input
-                type="email"
-                name="email"
-                placeholder="Email Address"
-                value={formData.email}
-                className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={handleChange}
-                required
-              />
+              <div>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email Address"
+                  value={formData.email}
+                  className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={handleChange}
+                />
+                {errors.email && (
+                  <p className="text-red-600 text-sm mt-1">
+                    {errors.email}
+                  </p>
+                )}
+              </div>
 
-              <input
-                type="tel"
-                name="phone"
-                placeholder="10 Digit Phone Number"
-                value={formData.phone}
-                maxLength="10"
-                className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={(e) => {
-                  const onlyNumbers =
-                    e.target.value.replace(
-                      /\D/g,
-                      ""
-                    );
+              <div>
+                <input
+                  type="tel"
+                  name="phone"
+                  placeholder="10 Digit Phone Number"
+                  value={formData.phone}
+                  maxLength="10"
+                  className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={handleChange}
+                />
+                {errors.phone && (
+                  <p className="text-red-600 text-sm mt-1">
+                    {errors.phone}
+                  </p>
+                )}
+              </div>
 
-                  setFormData({
-                    ...formData,
-                    phone: onlyNumbers,
-                  });
-                }}
-                required
-              />
-
-              <input
-                type="password"
-                name="password"
-                placeholder="Password Min 6 Characters"
-                value={formData.password}
-                className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={handleChange}
-                required
-              />
+              <div>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password Min 6 Characters"
+                  value={formData.password}
+                  className="w-full border border-gray-300 p-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={handleChange}
+                />
+                {errors.password && (
+                  <p className="text-red-600 text-sm mt-1">
+                    {errors.password}
+                  </p>
+                )}
+              </div>
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
               >
-                Register
+                {loading ? "Registering..." : "Register"}
               </button>
             </div>
 
