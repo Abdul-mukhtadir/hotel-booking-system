@@ -4,11 +4,14 @@ import {
   useContext,
 } from "react";
 
+import toast from "react-hot-toast";
+
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 import {
   getMyBookings,
+  cancelMyBooking,
 } from "../services/bookingService";
 
 import {
@@ -35,30 +38,55 @@ function MyBookingsPage() {
     }
   }, [user]);
 
-  const fetchBookings =
-    async () => {
-      if (!user?.token) return;
+  const fetchBookings = async () => {
+    if (!user?.token) return;
 
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        const data =
-          await getMyBookings(
-            user.token
-          );
+      const data = await getMyBookings(
+        user.token
+      );
 
-        setBookings(data);
-      } catch (error) {
-        console.log(
-          "Booking Error:",
-          error
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      setBookings(data);
+    } catch (error) {
+      console.log("Booking Error:", error);
+      toast.error("Failed to load bookings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    const confirmCancel = window.confirm(
+      "Are you sure you want to cancel this booking?"
+    );
+
+    if (!confirmCancel) return;
+
+    try {
+      await cancelMyBooking(
+        bookingId,
+        user.token
+      );
+
+      toast.success(
+        "Booking cancelled successfully"
+      );
+
+      fetchBookings();
+    } catch (error) {
+      console.log("Cancel Error:", error);
+
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to cancel booking"
+      );
+    }
+  };
 
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const upcomingBookings =
     bookings.filter(
@@ -89,6 +117,7 @@ function MyBookingsPage() {
 
   const BookingCard = ({
     booking,
+    showCancel = false,
   }) => (
     <div className="bg-white shadow-lg rounded-3xl overflow-hidden border border-gray-100">
       <div className="p-6">
@@ -153,14 +182,27 @@ function MyBookingsPage() {
         <div className="mt-6 flex flex-wrap gap-4 items-center">
           <button
             onClick={() =>
-              downloadInvoice(
-                booking
-              )
+              downloadInvoice(booking)
             }
             className="bg-green-600 text-white px-6 py-3 rounded-full font-bold hover:bg-green-700"
           >
             Download Invoice
           </button>
+
+          {showCancel &&
+            booking.bookingStatus !==
+              "Cancelled" && (
+              <button
+                onClick={() =>
+                  handleCancelBooking(
+                    booking._id
+                  )
+                }
+                className="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700"
+              >
+                Cancel Booking
+              </button>
+            )}
 
           <span className="bg-green-50 text-green-700 px-4 py-2 rounded-full font-bold">
             {booking.paymentStatus}
@@ -185,6 +227,7 @@ function MyBookingsPage() {
     title,
     subtitle,
     data,
+    showCancel = false,
   }) => (
     <section>
       <div className="flex items-center justify-between mb-5">
@@ -213,6 +256,7 @@ function MyBookingsPage() {
             <BookingCard
               key={booking._id}
               booking={booking}
+              showCancel={showCancel}
             />
           ))}
         </div>
@@ -236,7 +280,7 @@ function MyBookingsPage() {
             </h1>
 
             <p className="text-blue-100 mt-4">
-              Track upcoming, past, and cancelled reservations.
+              Track, cancel, and download invoices for your reservations.
             </p>
           </div>
         </div>
@@ -264,6 +308,7 @@ function MyBookingsPage() {
                 title="Upcoming Reservations"
                 subtitle="Your future confirmed stays"
                 data={upcomingBookings}
+                showCancel={true}
               />
 
               <BookingSection

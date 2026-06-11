@@ -1,6 +1,8 @@
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { Link } from "react-router-dom";
+import {
+  Link,
+} from "react-router-dom";
 
 function HomePage() {
   return (
@@ -32,27 +34,39 @@ function HomePage() {
               </Link>
 
               <Link
-                to="/register"
+                to="/mybookings"
                 className="border border-white px-7 py-4 rounded-full font-bold hover:bg-white hover:text-blue-700"
               >
-                Get Started
+                My Bookings
               </Link>
             </div>
 
             <div className="grid grid-cols-3 gap-6 mt-12">
               <div>
-                <h3 className="text-3xl font-bold">100+</h3>
-                <p className="text-blue-100">Rooms</p>
+                <h3 className="text-3xl font-bold">
+                  Multiple
+                </h3>
+                <p className="text-blue-100">
+                  Rooms
+                </p>
               </div>
 
               <div>
-                <h3 className="text-3xl font-bold">24/7</h3>
-                <p className="text-blue-100">Support</p>
+                <h3 className="text-3xl font-bold">
+                  24/7
+                </h3>
+                <p className="text-blue-100">
+                  Support
+                </p>
               </div>
 
               <div>
-                <h3 className="text-3xl font-bold">Secure</h3>
-                <p className="text-blue-100">Payments</p>
+                <h3 className="text-3xl font-bold">
+                  Secure
+                </h3>
+                <p className="text-blue-100">
+                  Payments
+                </p>
               </div>
             </div>
           </div>
