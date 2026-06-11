@@ -7,6 +7,7 @@ import {
   updateBooking,
   cancelBooking,
   sendBookingReminder,
+  checkRoomAvailability,
 } from "../controllers/bookingController.js";
 
 import {
@@ -19,6 +20,12 @@ router.get(
   "/all",
   protect,
   getAllBookings
+);
+
+router.post(
+  "/check-availability",
+  protect,
+  checkRoomAvailability
 );
 
 router.get(

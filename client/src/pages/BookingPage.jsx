@@ -22,6 +22,7 @@ import {
 
 import {
   createBooking,
+  checkRoomAvailability,
 } from "../services/bookingService";
 
 import {
@@ -62,6 +63,9 @@ function BookingPage() {
   const [appliedCoupon, setAppliedCoupon] =
     useState("");
 
+  const [availabilityLoading, setAvailabilityLoading] =
+    useState(false);
+
   const todayDate =
     new Date()
       .toISOString()
@@ -80,6 +84,12 @@ function BookingPage() {
     } catch (error) {
       console.log(error);
     }
+  };
+
+  const resetCoupon = () => {
+    setDiscount(0);
+    setFinalAmount(null);
+    setAppliedCoupon("");
   };
 
   const calculateDays = () => {
@@ -160,6 +170,39 @@ function BookingPage() {
     return true;
   };
 
+  const checkAvailabilityBeforePayment =
+    async () => {
+      if (!validateBooking()) {
+        return false;
+      }
+
+      try {
+        setAvailabilityLoading(true);
+
+        await checkRoomAvailability(
+          {
+            room: room._id,
+            checkInDate,
+            checkOutDate,
+            guests: Number(guests),
+          },
+          user.token
+        );
+
+        return true;
+      } catch (error) {
+        toast.error(
+          error.response?.data
+            ?.message ||
+            "Room is not available for selected dates"
+        );
+
+        return false;
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    };
+
   const totalPrice =
     room?.price *
     calculateDays();
@@ -230,7 +273,10 @@ function BookingPage() {
         return;
       }
 
-      if (!validateBooking()) {
+      const isAvailable =
+        await checkAvailabilityBeforePayment();
+
+      if (!isAvailable) {
         return;
       }
 
@@ -366,7 +412,7 @@ function BookingPage() {
             </h1>
 
             <p className="text-blue-100 mt-4">
-              Review your stay details, apply coupon, and pay securely.
+              Review your stay details, check availability, apply coupon, and pay securely.
             </p>
           </div>
         </div>
@@ -477,9 +523,7 @@ function BookingPage() {
                           e.target.value
                         );
 
-                        setDiscount(0);
-                        setFinalAmount(null);
-                        setAppliedCoupon("");
+                        resetCoupon();
                       }}
                     />
                   </div>
@@ -502,9 +546,7 @@ function BookingPage() {
                           e.target.value
                         );
 
-                        setDiscount(0);
-                        setFinalAmount(null);
-                        setAppliedCoupon("");
+                        resetCoupon();
                       }}
                     />
                   </div>
@@ -520,13 +562,15 @@ function BookingPage() {
                       max={room.capacity}
                       className="w-full border border-gray-300 p-4 rounded-2xl mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={guests}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setGuests(
                           Number(
                             e.target.value
                           )
-                        )
-                      }
+                        );
+
+                        resetCoupon();
+                      }}
                     />
                   </div>
 
@@ -557,6 +601,10 @@ function BookingPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-5 bg-blue-50 text-blue-700 p-4 rounded-2xl">
+                  Availability is checked before payment. If the room is already booked for selected dates, payment will not start.
                 </div>
               </div>
             </div>
@@ -623,9 +671,16 @@ function BookingPage() {
 
                 <button
                   onClick={handlePayment}
-                  className="w-full mt-6 bg-blue-600 text-white py-4 rounded-2xl text-lg font-bold hover:bg-blue-700"
+                  disabled={availabilityLoading}
+                  className={
+                    availabilityLoading
+                      ? "w-full mt-6 bg-gray-400 text-white py-4 rounded-2xl text-lg font-bold cursor-not-allowed"
+                      : "w-full mt-6 bg-blue-600 text-white py-4 rounded-2xl text-lg font-bold hover:bg-blue-700"
+                  }
                 >
-                  Pay & Book Now
+                  {availabilityLoading
+                    ? "Checking Availability..."
+                    : "Pay & Book Now"}
                 </button>
 
                 <p className="text-center text-xs text-gray-500 mt-4">
