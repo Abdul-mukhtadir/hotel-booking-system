@@ -1,10 +1,22 @@
+import {
+  useContext,
+} from "react";
+
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+
 import {
   Link,
 } from "react-router-dom";
 
+import {
+  AuthContext,
+} from "../context/AuthContext";
+
 function HomePage() {
+  const { user } =
+    useContext(AuthContext);
+
   return (
     <>
       <Navbar />
@@ -33,12 +45,21 @@ function HomePage() {
                 Explore Hotels
               </Link>
 
-              <Link
-                to="/mybookings"
-                className="border border-white px-7 py-4 rounded-full font-bold hover:bg-white hover:text-blue-700"
-              >
-                My Bookings
-              </Link>
+              {user ? (
+                <Link
+                  to="/mybookings"
+                  className="border border-white px-7 py-4 rounded-full font-bold hover:bg-white hover:text-blue-700"
+                >
+                  My Bookings
+                </Link>
+              ) : (
+                <Link
+                  to="/register"
+                  className="border border-white px-7 py-4 rounded-full font-bold hover:bg-white hover:text-blue-700"
+                >
+                  Get Started
+                </Link>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-6 mt-12">
