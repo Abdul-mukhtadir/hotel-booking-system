@@ -246,6 +246,4 @@ Users can download booking invoices containing:
 
 Abdul Mukhtadir Shaik
 
-MCA Final Project
-
 Hotel Booking System
